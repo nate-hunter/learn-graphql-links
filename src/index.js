@@ -1,6 +1,7 @@
 const { ApolloServer } = require('apollo-server');
-const fs = require('fs')
-const path = require('path')
+const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
 
 
 // ADDING MUTATIONS:
@@ -8,60 +9,67 @@ const path = require('path')
 // [x] Refacter schema to a new file (and adjust the GraphQLServer instance)
 // [x] Implement the resolver function
 // [x] Test Mutation
-// [] Add CRUD
+// [x] Add CRUD
 
 
-let links = [{
-    id: 'link-0',
-    description: 'Where to start to learn GraphQL',
-    url: 'www.howtographql.com'
-},
-{
-    id: 'link-1',
-    description: 'GraphQL home base',
-    url: 'www.graphql.org'
-}
-]
+// let links = [{
+//     id: 'link-0',
+//     description: 'Where to start to learn GraphQL',
+//     url: 'www.howtographql.com'
+// },
+// {
+//     id: 'link-1',
+//     description: 'GraphQL home base',
+//     url: 'www.graphql.org'
+// }
+// ]
 
-let linkIdCount = links.length
+// let linkIdCount = links.length
+
+const prisma = new PrismaClient();
 
 let linkFields = ['id', 'description', 'url'];
 
 const resolvers = {
     Query: {
         info: () => `This is an app to help manage and track learning GraphQL.`,
-        feed: () => links,
+        feed: async (parent, args, context, info) => await context.prisma.link.findMany(),
     },
 
     Mutation: {
-        post: (parent, args) => {
-            let link = {}
-            linkFields.forEach(field => {
-                if (field === 'id') {
-                    link['id'] = `link-${linkIdCount++}`
-                } else if (args[field]) {
-                    link[field] = args[field]
-                }
-            });
-            links.push(link)
-            return link;
+        post: (parent, args, context, info) => {
+            let newLink = context.prisma.link.create({
+                data: {
+                    url: args.url,
+                    description: args.description,
+                },
+            })
+            // linkFields.forEach(field => {
+            //     if (field === 'id') {
+            //         link['id'] = `link-${linkIdCount++}`
+            //     } else if (args[field]) {
+            //         link[field] = args[field]
+            //     }
+            // });
+            // links.push(link)
+            return newLink;
         },
-        updateLink: (parent, args) => {
-            let link = links.filter(link => link.id === args.id)[0]
-            for (const key in args) {
-                if (Object.hasOwnProperty.call(args, key) && key !== 'id') {
-                    const element = args[key];
-                    link[key] = element
-                }
-            }
-            return link;
-        },
-        deleteLink: (parent, args) => {
-            let deletedLink = links.find(deletedLink => deletedLink.id === args.id)
-            const remainingLinks = links.filter(link => link.id !== deletedLink.id)
-            links = remainingLinks;
-            return deletedLink;
-        }
+        // updateLink: (parent, args) => {
+        //     let link = links.filter(link => link.id === args.id)[0]
+        //     for (const key in args) {
+        //         if (Object.hasOwnProperty.call(args, key) && key !== 'id') {
+        //             const element = args[key];
+        //             link[key] = element
+        //         }
+        //     }
+        //     return link;
+        // },
+        // deleteLink: (parent, args) => {
+        //     let deletedLink = links.find(deletedLink => deletedLink.id === args.id)
+        //     const remainingLinks = links.filter(link => link.id !== deletedLink.id)
+        //     links = remainingLinks;
+        //     return deletedLink;
+        // }
     }
 }
 
@@ -71,6 +79,9 @@ const server = new ApolloServer({
         'utf8'
     ),
     resolvers,
+    context: {
+        prisma,
+    }
 })
 
 server
